@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>智能记账 · Liquid Glass</title>
+    <link rel="stylesheet" href="./assets/element-plus.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!-- 启动加载屏：应用挂载后由 app.js 移除 -->
+    <div id="splash">
+      <div class="splash-orb">
+        <svg viewBox="0 0 48 48" width="34" height="34" fill="none">
+          <rect x="4" y="6" width="40" height="36" rx="9" fill="rgba(255,255,255,0.85)"/>
+          <path d="M14 17h20M14 24h13M14 31h20" stroke="#0A84FF" stroke-width="3.4" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="splash-name">智能记账</div>
+      <div class="splash-hint">Liquid Glass · All-in-AI</div>
+    </div>
+
+    <div id="app"></div>
+
+    <script src="./assets/vue.global.prod.js"></script>
+    <script src="./assets/element-plus.full.min.js"></script>
+    <script src="./assets/element-plus-icons.iife.min.js"></script>
+    <script src="./assets/chart.umd.min.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

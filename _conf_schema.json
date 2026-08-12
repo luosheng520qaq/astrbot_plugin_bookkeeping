@@ -1,0 +1,46 @@
+{
+  "currency": {
+    "type": "string",
+    "description": "货币符号，显示在金额前",
+    "default": "¥",
+    "hint": "例如 ¥、$、€"
+  },
+  "timezone": {
+    "type": "string",
+    "description": "时区，影响按日期聚合统计",
+    "default": "Asia/Shanghai",
+    "hint": "IANA 时区名，默认 Asia/Shanghai"
+  },
+  "warn_large_amount": {
+    "type": "float",
+    "description": "单笔大额预警阈值（0 表示不预警）",
+    "default": 1000,
+    "hint": "超过此金额时插件会向用户二次确认"
+  },
+  "page_size": {
+    "type": "int",
+    "description": "WebUI 列表默认每页条数",
+    "default": 20,
+    "hint": "建议 10-50"
+  },
+  "enable_image_receipt": {
+    "type": "bool",
+    "description": "开启后每月账单概览可生成图片，便于聊天端发送",
+    "default": true
+  },
+  "anime_bg_api": {
+    "type": "list",
+    "description": "WebUI 随机二次元背景图 API 列表（留空使用内置默认源）",
+    "items": {
+      "type": "string"
+    },
+    "default": [
+      "https://api.btstu.cn/sjbz/api.php?lx=dongman",
+      "https://t.alcy.cc/pc/",
+      "https://www.dmoe.cc/random.php",
+      "https://api.anosu.top/img",
+      "https://api.vvhan.com/api/acgimg"
+    ],
+    "hint": "支持两类：① 直接返回图片的接口（如 sjbz/api.php）；② 返回 JSON 的接口（自动识别 url/imgurl/image 字段）。修改后需在管理后台保存，WebUI 刷新后生效。"
+  }
+}
