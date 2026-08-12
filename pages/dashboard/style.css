@@ -1014,66 +1014,33 @@ body {
 }
 .el-overlay { background-color: rgba(20,24,36,0.3) !important; -webkit-backdrop-filter: blur(6px) !important; backdrop-filter: blur(6px) !important; }
 
-/* 对话框移动端自适应：弹层改为 flex 列布局，仅 body 滚动，
-   保证 header/footer 始终可见可点击；移除 overlay 的 backdrop-filter
-   避免 iOS Safari 下触摸滚动失效。 */
+/* 对话框移动端自适应：手机端 el-dialog 切换为 fullscreen 全屏模式，
+   由 Element Plus 保证占满视口；这里仅微调为 header/footer 固定、
+   body 内部滚动的结构，并移除 overlay 的 backdrop-filter 避免 iOS 触摸滚动失效。 */
 @media (max-width: 640px) {
-  .el-overlay {
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
-  }
+  /* 1. 外层不居中、不限制，让弹窗顶到最左 */
   .el-overlay-dialog {
-    display: flex !important;
-    align-items: flex-start !important;
-    justify-content: center !important;
-    min-height: 100%;
-    padding: 12px 0;
-    box-sizing: border-box;
+    display: block !important;
+    padding: 0 !important;
   }
-  .el-dialog {
-    width: calc(100vw - 24px) !important;
+
+  /* 2. 弹窗占满屏宽，靠左 */
+  .el-dialog.is-fullscreen {
+    width: 100% !important;
+    max-width: 100% !important;
     margin: 0 !important;
-    max-height: calc(100vh - 24px);
-    max-height: calc(100dvh - 24px);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
   }
-  .el-dialog__header { flex-shrink: 0; padding: 16px 18px 12px !important; }
-  .el-dialog__body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    padding: 16px 18px !important;
+
+  /* 3. 表单控件强制撑满（解决分类下拉等输入框窄） */
+  .el-dialog .el-form-item__content {
+    width: 100% !important;
+    flex: 1 1 100% !important;
   }
-  .el-dialog__footer { flex-shrink: 0; padding: 12px 18px 16px !important; }
-  .el-dialog .el-form-item { display: flex; flex-wrap: wrap; margin-bottom: 16px; }
-  .el-dialog .el-form-item__label { width: 100% !important; text-align: left; padding: 0 0 6px; }
-  .el-dialog .el-form-item__content { margin-left: 0 !important; width: 100% !important; flex: 1 1 100%; }
-  /* 所有输入控件占满宽度（覆盖内联 style="width:200px" 等） */
+  .el-dialog .el-select,
   .el-dialog .el-input,
-  .el-dialog .el-date-editor,
   .el-dialog .el-input-number,
-  .el-dialog .el-select { width: 100% !important; }
-  .el-dialog .el-radio-group { display: flex; flex-wrap: wrap; }
-  .el-dialog .el-button { touch-action: manipulation; }
-  /* emoji 网格：固定 6 列，更大触控区 */
-  .el-dialog .bk-emoji-grid {
-    flex: 1 0 100%;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 8px;
-  }
-  .el-dialog .bk-emoji-item { height: 40px; line-height: 40px; font-size: 20px; }
-  /* emoji 操作区：输入框占满一行，按钮换行 */
-  .el-dialog .bk-emoji-actions { flex: 1 0 100%; flex-wrap: wrap; }
-  .el-dialog .bk-emoji-actions .el-input { flex: 1 1 100%; margin-bottom: 8px; }
-  /* 颜色选择器加宽 */
-  .el-dialog .el-color-picker__trigger { width: 100%; height: 36px; }
-  .el-message-box {
-    width: calc(100vw - 24px) !important;
-    max-width: calc(100vw - 24px);
+  .el-dialog .el-date-editor {
+    width: 100% !important;
   }
 }
 

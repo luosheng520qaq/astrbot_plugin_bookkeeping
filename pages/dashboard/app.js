@@ -100,6 +100,10 @@ function isMobile() {
   return (window.innerWidth || document.documentElement.clientWidth) <= 640;
 }
 
+/* 响应式移动端标志：用于 el-dialog 在手机上切换为全屏模式 */
+const isMobileView = ref(isMobile());
+window.addEventListener("resize", () => { isMobileView.value = isMobile(); });
+
 /* ============================================================
  * 随机二次元背景管理器
  * 背景图 API 可在插件配置 anime_bg_api 中自由指定（逗号分隔）：
@@ -591,7 +595,7 @@ const TransactionsView = {
         </div>
       </div>
 
-      <el-dialog v-model="dialog.visible" :title="dialog.id ? '编辑交易' : '新增交易'" width="520px">
+      <el-dialog v-model="dialog.visible" :title="dialog.id ? '编辑交易' : '新增交易'" width="520px" :fullscreen="isMobileView">
         <el-form :model="dialog.form" label-width="80px" size="default">
           <el-form-item label="类型">
             <el-radio-group v-model="dialog.form.type">
@@ -776,7 +780,7 @@ const TransactionsView = {
       loading, items, total, page, pageSize, categories, accounts,
       filter, dateRange, dialog, filteredCats, accTypeLabel,
       load, search, resetFilter, openCreate, openEdit, save, del, exportCsv,
-      fmtMoney, typeColor, TYPE_LABEL
+      fmtMoney, typeColor, TYPE_LABEL, isMobileView
     };
   }
 };
@@ -813,7 +817,7 @@ const CategoriesView = {
       </div>
       <div v-if="!filtered.length" class="bk-empty"><span class="emoji">📭</span>暂无分类</div>
 
-      <el-dialog v-model="dialog.visible" :title="dialog.id ? '编辑分类' : '新增分类'" width="420px">
+      <el-dialog v-model="dialog.visible" :title="dialog.id ? '编辑分类' : '新增分类'" width="420px" :fullscreen="isMobileView">
         <el-form :model="dialog.form" label-width="70px">
           <el-form-item label="名称"><el-input v-model="dialog.form.name" /></el-form-item>
           <el-form-item label="类型">
@@ -901,7 +905,7 @@ const CategoriesView = {
       } catch (e) {}
     }
     onMounted(load);
-    return { loading, items, filtered, typeFilter, dialog, EMOJI_PRESET, toggleIcon, openCreate, openEdit, save, del };
+    return { loading, items, filtered, typeFilter, dialog, EMOJI_PRESET, toggleIcon, openCreate, openEdit, save, del, isMobileView };
   }
 };
 
@@ -938,7 +942,7 @@ const AccountsView = {
       </div>
       <div v-if="!items.length" class="bk-empty"><span class="emoji">🏦</span>暂无账户</div>
 
-      <el-dialog v-model="dialog.visible" :title="dialog.id ? '编辑账户' : '新增账户'" width="420px">
+      <el-dialog v-model="dialog.visible" :title="dialog.id ? '编辑账户' : '新增账户'" width="420px" :fullscreen="isMobileView">
         <el-form :model="dialog.form" label-width="80px">
           <el-form-item label="名称"><el-input v-model="dialog.form.name" /></el-form-item>
           <el-form-item label="类型">
@@ -957,7 +961,7 @@ const AccountsView = {
         </template>
       </el-dialog>
 
-      <el-dialog v-model="adjustDialog.visible" title="账户对账" width="420px">
+      <el-dialog v-model="adjustDialog.visible" title="账户对账" width="420px" :fullscreen="isMobileView">
         <el-form label-width="100px">
           <el-form-item label="账户">{{ adjustDialog.account?.name }}</el-form-item>
           <el-form-item label="当前余额">{{ fmtMoney(adjustDialog.account?.balance) }}</el-form-item>
@@ -1068,7 +1072,7 @@ const AccountsView = {
       loading, items, dialog, adjustDialog, accTypeLabel,
       totalAssets, diff, iconOf, colorOf,
       openCreate, save, openAdjust, saveAdjust, archive, del,
-      fmtMoney, typeColor
+      fmtMoney, typeColor, isMobileView
     };
   }
 };
