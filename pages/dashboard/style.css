@@ -1051,12 +1051,26 @@ body {
   .el-dialog__footer { flex-shrink: 0; padding: 12px 18px 16px !important; }
   .el-dialog .el-form-item { display: flex; flex-wrap: wrap; margin-bottom: 16px; }
   .el-dialog .el-form-item__label { width: 100% !important; text-align: left; padding: 0 0 6px; }
-  .el-dialog .el-form-item__content { margin-left: 0 !important; width: 100%; }
+  .el-dialog .el-form-item__content { margin-left: 0 !important; width: 100% !important; flex: 1 1 100%; }
+  /* 所有输入控件占满宽度（覆盖内联 style="width:200px" 等） */
+  .el-dialog .el-input,
   .el-dialog .el-date-editor,
   .el-dialog .el-input-number,
   .el-dialog .el-select { width: 100% !important; }
   .el-dialog .el-radio-group { display: flex; flex-wrap: wrap; }
   .el-dialog .el-button { touch-action: manipulation; }
+  /* emoji 网格：固定 6 列，更大触控区 */
+  .el-dialog .bk-emoji-grid {
+    flex: 1 0 100%;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+  }
+  .el-dialog .bk-emoji-item { height: 40px; line-height: 40px; font-size: 20px; }
+  /* emoji 操作区：输入框占满一行，按钮换行 */
+  .el-dialog .bk-emoji-actions { flex: 1 0 100%; flex-wrap: wrap; }
+  .el-dialog .bk-emoji-actions .el-input { flex: 1 1 100%; margin-bottom: 8px; }
+  /* 颜色选择器加宽 */
+  .el-dialog .el-color-picker__trigger { width: 100%; height: 36px; }
   .el-message-box {
     width: calc(100vw - 24px) !important;
     max-width: calc(100vw - 24px);
