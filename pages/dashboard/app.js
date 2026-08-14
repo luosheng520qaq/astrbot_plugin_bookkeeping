@@ -90,8 +90,8 @@ const EMOJI_PRESET = [
 /* 交易类型颜色：适配深浅主题 */
 function typeColor(type) {
   const dark = document.documentElement.getAttribute("data-theme") === "dark";
-  const light = { expense: "#E0352B", income: "#1FA55A", transfer: "#D97E00" };
-  const dk = { expense: "#FF453A", income: "#32D74B", transfer: "#FF9F0A" };
+  const light = { expense: "#E0554C", income: "#2BB56B", transfer: "#D68A1E" };
+  const dk = { expense: "#FF6B61", income: "#4CD98C", transfer: "#FFB84D" };
   return (dark ? dk : light)[type] || "#8E8E93";
 }
 
@@ -224,13 +224,16 @@ const DashboardView = {
   template: `
     <div v-loading="loading">
       <div class="bk-toolbar">
-        <el-radio-group v-model="period" @change="onPeriodChange">
-          <el-radio-button label="today">今日</el-radio-button>
-          <el-radio-button label="this_week">本周</el-radio-button>
-          <el-radio-button label="this_month">本月</el-radio-button>
-          <el-radio-button label="last_month">上月</el-radio-button>
-          <el-radio-button label="this_year">今年</el-radio-button>
-        </el-radio-group>
+        <div class="bk-period-switch" ref="periodRef">
+          <div class="bk-period-slider" :style="periodSliderStyle"></div>
+          <el-radio-group v-model="period" @change="onPeriodChange">
+            <el-radio-button label="today">今日</el-radio-button>
+            <el-radio-button label="this_week">本周</el-radio-button>
+            <el-radio-button label="this_month">本月</el-radio-button>
+            <el-radio-button label="last_month">上月</el-radio-button>
+            <el-radio-button label="this_year">今年</el-radio-button>
+          </el-radio-group>
+        </div>
         <el-date-picker v-model="customRange" type="daterange" range-separator="-"
           start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD"
           style="width:236px" @change="onCustomRange" />
@@ -350,6 +353,26 @@ const DashboardView = {
     const loading = ref(false);
     const period = ref("this_month");
     const customRange = ref([]);
+
+    /* ---- 日期范围分段滑块 ---- */
+    const periodRef = ref(null);
+    const periodSliderStyle = ref({ left: "0px", width: "0px", opacity: 0 });
+    function updatePeriodSlider() {
+      nextTick(() => {
+        const container = periodRef.value;
+        if (!container) return;
+        const activeBtn = container.querySelector(".el-radio-button.is-active");
+        if (activeBtn) {
+          const cRect = container.getBoundingClientRect();
+          const bRect = activeBtn.getBoundingClientRect();
+          periodSliderStyle.value = {
+            left: (bRect.left - cRect.left) + "px",
+            width: bRect.width + "px",
+            opacity: 1,
+          };
+        }
+      });
+    }
     const summary = reactive({ total_expense: 0, total_income: 0, balance: 0, tx_count: 0 });
     const recent = ref([]);
     const accounts = ref([]);
@@ -403,15 +426,15 @@ const DashboardView = {
       const ctx = canvas.getContext("2d");
       const dark = isDark();
       const grad = ctx.createLinearGradient(0, 0, 0, 260);
-      grad.addColorStop(0, dark ? "rgba(255,69,58,0.35)" : "rgba(255,59,48,0.28)");
-      grad.addColorStop(1, dark ? "rgba(255,69,58,0.02)" : "rgba(255,59,48,0.01)");
+      grad.addColorStop(0, dark ? "rgba(255,107,97,0.32)" : "rgba(255,107,97,0.28)");
+      grad.addColorStop(1, dark ? "rgba(255,107,97,0.02)" : "rgba(255,107,97,0.01)");
       const axisColor = dark ? "#8A8A94" : "#9A9AA2";
       const chart = new Chart(ctx, {
         type: "line",
         data: { labels, datasets: [{
-          label: "支出", data, borderColor: dark ? "#FF453A" : "#FF3B30",
+          label: "支出", data, borderColor: dark ? "#FF6B61" : "#FF6B61",
           backgroundColor: grad, tension: 0.4, fill: true,
-          pointRadius: 3, pointBackgroundColor: dark ? "#FF453A" : "#FF3B30",
+          pointRadius: 3, pointBackgroundColor: dark ? "#FF6B61" : "#FF6B61",
           pointBorderColor: "rgba(255,255,255,0.9)", pointBorderWidth: 2, pointHoverRadius: 6
         }] },
         options: {
@@ -468,8 +491,8 @@ const DashboardView = {
       const chart = new Chart(canvas.getContext("2d"), {
         type: "bar",
         data: { labels: labels.map(d => d ? d.slice(5) : ""), datasets: [
-          { label: "支出", data: labels.map(d => expMap[d] || 0), backgroundColor: dark ? "#FF453A" : "#FF3B30", borderRadius: 6, borderSkipped: false },
-          { label: "收入", data: labels.map(d => incMap[d] || 0), backgroundColor: dark ? "#32D74B" : "#28C76F", borderRadius: 6, borderSkipped: false }
+          { label: "支出", data: labels.map(d => expMap[d] || 0), backgroundColor: dark ? "#FF6B61" : "#FF6B61", borderRadius: 6, borderSkipped: false },
+          { label: "收入", data: labels.map(d => incMap[d] || 0), backgroundColor: dark ? "#54D891" : "#3ED283", borderRadius: 6, borderSkipped: false }
         ] },
         options: {
           responsive: true, maintainAspectRatio: false,
@@ -502,11 +525,11 @@ const DashboardView = {
         tags.value = d.tag_stats || [];
         await nextTick();
         const expPalette = isDark()
-          ? ["#FF453A","#FF9F0A","#32D74B","#0A84FF","#BF5AF2","#FF375F","#64D2FF","#30D158","#98989D","#AC8E68"]
-          : ["#FF3B30","#FF9F0A","#28C76F","#0A84FF","#AF52DE","#FF2D55","#5AC8FA","#34C759","#8E8E93","#A2845E"];
+          ? ["#FF8F87","#FFD88F","#5FDE9E","#7AC6F8","#D3AEF2","#FF94A8","#A5DCFD","#7BE3AC","#C0C0CC","#D8C4AD"]
+          : ["#FF6B61","#FFBF4D","#3ED283","#6FBDF6","#C79AEC","#FF7A94","#8FD0FA","#5FDE9E","#B0B0BC","#C9B49D"];
         const incPalette = isDark()
-          ? ["#32D74B","#64D2FF","#FF9F0A","#0A84FF","#FF375F","#30D158","#BF5AF2"]
-          : ["#28C76F","#5AC8FA","#FF9F0A","#0A84FF","#FF2D55","#34C759","#AF52DE"];
+          ? ["#5FDE9E","#A5DCFD","#FFD88F","#7AC6F8","#FF94A8","#7BE3AC","#D3AEF2"]
+          : ["#3ED283","#8FD0FA","#FFBF4D","#6FBDF6","#FF7A94","#5FDE9E","#C79AEC"];
         renderLine(dailyCanvas.value, d.daily_expense || []);
         renderPie(pieCanvas.value, d.categories_expense || [], expPalette);
         renderPie(incPie.value, d.categories_income || [], incPalette);
@@ -519,13 +542,20 @@ const DashboardView = {
     }
 
     watch(period, load);
-    onMounted(load);
+    watch(period, updatePeriodSlider);
+    onMounted(() => {
+      load();
+      updatePeriodSlider();
+      window.addEventListener("resize", updatePeriodSlider);
+    });
+    onUnmounted(() => { window.removeEventListener("resize", updatePeriodSlider); });
     return {
       loading, period, customRange, rangeLabel, summary, recent, accounts,
       top, tags, totalAssets,
       dailyCanvas, pieCanvas, incPie, dailyBoth,
       fmtMoney, typeColor, TYPE_LABEL,
       onCustomRange, onPeriodChange, load,
+      periodRef, periodSliderStyle,
     };
   }
 };
@@ -1240,6 +1270,8 @@ const App = {
   },
   template: `
     <div class="bk-layout">
+      <!-- 主题切换遮罩动画 -->
+      <div class="theme-mask" :style="themeMaskStyle"></div>
       <!-- 随机二次元背景 -->
       <div v-if="bgEnabled" class="bg-stage" aria-hidden="true">
         <div class="bg-layer" :class="{ on: bgLayerIdx === 0, kenburns: bgLayerIdx === 0 }" :style="bgStyle(0)"></div>
@@ -1255,8 +1287,10 @@ const App = {
             <b>AI的小账本</b>
           </div>
         </div>
-        <nav class="bk-menu">
+        <nav class="bk-menu" ref="menuRef">
+          <div class="bk-menu-slider" :style="menuSliderStyle"></div>
           <div v-for="m in menus" :key="m.key" class="bk-menu-item"
+               :ref="el => setMenuItemEl(m.key, el)"
                :class="{active: active===m.key}" @click="active=m.key">
             <el-icon :size="19"><component :is="m.icon" /></el-icon>
             <span>{{ m.label }}</span>
@@ -1267,7 +1301,7 @@ const App = {
             <el-icon :size="18"><component :is="bgEnabled ? 'PictureFilled' : 'Picture'" /></el-icon>
             <span>{{ bgEnabled ? '背景图：开' : '背景图：关' }}</span>
           </button>
-          <button class="bk-theme-btn" @click="toggleTheme">
+          <button class="bk-theme-btn" ref="themeBtnRef" @click="toggleTheme">
             <el-icon :size="18"><component :is="theme==='dark' ? 'Sunny' : 'Moon'" /></el-icon>
             <span>{{ theme==='dark' ? '浅色模式' : '深色模式' }}</span>
           </button>
@@ -1308,6 +1342,25 @@ const App = {
     const active = ref("dashboard");
     const theme = ref(safeStorage.getItem("bk-theme") || "light");
     const viewRef = ref(null);
+
+    /* ---- 侧边栏菜单滑块 ---- */
+    const menuRef = ref(null);
+    const menuItemEls = {};
+    const menuSliderStyle = ref({ top: "0px", height: "0px", opacity: 0 });
+    function setMenuItemEl(key, el) { if (el) menuItemEls[key] = el; }
+    function updateMenuSlider() {
+      nextTick(() => {
+        const el = menuItemEls[active.value];
+        const nav = menuRef.value;
+        if (el && nav) {
+          menuSliderStyle.value = {
+            top: el.offsetTop + "px",
+            height: el.offsetHeight + "px",
+            opacity: 1,
+          };
+        }
+      });
+    }
 
     /* ---- 动漫背景状态 ---- */
     const bgUrls = ref(["", ""]);
@@ -1370,10 +1423,67 @@ const App = {
       }
     }
 
+    /* ---- 主题切换遮罩动画 ---- */
+    const themeBtnRef = ref(null);
+    const themeMaskStyle = ref({});
+    let themeAnimating = false;
+
     function toggleTheme() {
-      theme.value = theme.value === "dark" ? "light" : "dark";
-      safeStorage.setItem("bk-theme", theme.value);
-      document.documentElement.setAttribute("data-theme", theme.value);
+      if (themeAnimating) return;
+      themeAnimating = true;
+      const next = theme.value === "dark" ? "light" : "dark";
+
+      // 扩散中心取主题按钮位置，取不到则用屏幕中心
+      let x = window.innerWidth / 2, y = window.innerHeight / 2;
+      if (themeBtnRef.value) {
+        const r = themeBtnRef.value.getBoundingClientRect();
+        x = r.left + r.width / 2;
+        y = r.top + r.height / 2;
+      }
+      const radius = Math.hypot(
+        Math.max(x, window.innerWidth - x),
+        Math.max(y, window.innerHeight - y)
+      );
+      const maskColor = next === "dark" ? "#0b0d18" : "#eef1f8";
+
+      themeMaskStyle.value = {
+        background: maskColor,
+        clipPath: `circle(0px at ${x}px ${y}px)`,
+        opacity: 0,
+      };
+
+      // 双层 rAF 确保初始状态先渲染，再触发展开动画
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          themeMaskStyle.value = {
+            background: maskColor,
+            clipPath: `circle(${radius}px at ${x}px ${y}px)`,
+            opacity: 1,
+          };
+        });
+      });
+
+      // 遮罩展开过半时切换主题
+      setTimeout(() => {
+        theme.value = next;
+        safeStorage.setItem("bk-theme", next);
+        document.documentElement.setAttribute("data-theme", next);
+      }, 320);
+
+      // 展开完成后淡出遮罩，揭示新主题
+      setTimeout(() => {
+        themeMaskStyle.value = {
+          background: maskColor,
+          clipPath: `circle(${radius}px at ${x}px ${y}px)`,
+          opacity: 0,
+        };
+      }, 680);
+
+      // 动画结束，清理
+      setTimeout(() => {
+        themeMaskStyle.value = {};
+        themeAnimating = false;
+      }, 1150);
     }
     function onNavigate(key) { active.value = key; }
     function refresh() {
@@ -1381,19 +1491,26 @@ const App = {
       else { active.value = active.value; /* 重新挂载 */ }
     }
 
+    watch(active, updateMenuSlider);
     onMounted(() => {
       document.documentElement.setAttribute("data-theme", theme.value);
+      updateMenuSlider();
+      window.addEventListener("resize", updateMenuSlider);
       if (bgEnabled.value) {
         nextBg();
         // 每 60s 自动切换一次二次元背景
         bgTimer = setInterval(() => { nextBg(); }, 60000);
       }
     });
-    onUnmounted(() => { if (bgTimer) clearInterval(bgTimer); });
+    onUnmounted(() => {
+      if (bgTimer) clearInterval(bgTimer);
+      window.removeEventListener("resize", updateMenuSlider);
+    });
 
     return {
       menus, active, theme, viewRef, currentMenu, currentView,
       bgUrls, bgLayerIdx, bgStyle, nextBg, bgEnabled, toggleBgEnabled,
+      menuRef, menuSliderStyle, setMenuItemEl,
       toggleTheme, onNavigate, refresh
     };
   }
