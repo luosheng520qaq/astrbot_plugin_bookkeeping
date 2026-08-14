@@ -1,7 +1,7 @@
 name: astrbot_plugin_bookkeeping
 desc: All-in-AI 智能记账插件，提供丰富的 LLM 工具与美观的 WebUI 仪表盘
 display_name: 智能记账插件
-version: v0.2.0
+version: v0.3.0
 author: Xican
 repo: "https://github.com/luosheng520qaq/astrbot_plugin_bookkeeping"
 astrbot_version: ">=4.27.0"

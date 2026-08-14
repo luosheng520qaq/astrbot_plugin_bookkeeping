@@ -109,7 +109,7 @@ window.addEventListener("resize", () => { isMobileView.value = isMobile(); });
  * 背景图 API 可在插件配置 anime_bg_api 中自由指定（逗号分隔）：
  *   - 直接返回图片的接口（如 https://.../random.jpg）
  *   - 返回 JSON 的接口（自动提取 url / imgurl / image / data.url）
- * 留空时使用内置默认源。
+ * 留空时不显示背景图（仅渐变底色），侧边栏底部可随时开关。
  * ============================================================ */
 const DEFAULT_BG_SOURCES = [
   "https://api.btstu.cn/sjbz/api.php?lx=dongman",
@@ -139,14 +139,15 @@ function parseBgSources(cfgVal) {
   return list.map(s => String(s).trim()).filter(s => /^https?:\/\//i.test(s));
 }
 
-/* 从配置更新背景源；配置为空则回退内置默认 */
+/* 从配置更新背景源；配置为空则禁用背景图（BG_SOURCES 为空数组），
+   只显示渐变底色，不再回退内置默认源。 */
 function applyBgConfig(cfg) {
-  const custom = parseBgSources(cfg?.anime_bg_api);
-  BG_SOURCES = custom.length ? custom : [...DEFAULT_BG_SOURCES];
+  BG_SOURCES = parseBgSources(cfg?.anime_bg_api);
 }
 
 /* 解析一张二次元图。先尝试 JSON 接口，再尝试直接图片。 */
 async function fetchRandomAnimeBg() {
+  if (!BG_SOURCES.length) return null;
   for (let attempt = 0; attempt < 3; attempt++) {
     const src = BG_SOURCES[Math.floor(Math.random() * BG_SOURCES.length)];
     const url = await tryResolveBg(src);
@@ -1160,7 +1161,7 @@ const SettingsView = {
                 <span class="type-tag transfer" style="margin-right:6px">{{ i + 1 }}</span>{{ u }}
               </div>
             </div>
-            <span v-else>使用内置默认源</span>
+            <span v-else>未配置（不显示背景图，使用渐变底色）</span>
           </el-descriptions-item>
         </el-descriptions>
         <div class="bk-export-btns">
@@ -1181,7 +1182,7 @@ const SettingsView = {
           <li>"我还有多少钱" / "新建账户 基金 余额 1000"</li>
         </ul>
         <p class="bk-settings-tip" style="margin-top:14px">
-          🖼️ <b>自定义背景</b>：在 AstrBot 管理后台 → 插件配置 → 「背景图 API」中添加你的随机二次元图接口（一个列表项一个 API），支持直接返图或返回 JSON（自动识别 url/imgurl/image 字段），保存后刷新页面生效。
+          🖼️ <b>自定义背景</b>：在 AstrBot 管理后台 → 插件配置 → 「背景图 API」中添加你的随机二次元图接口（一个列表项一个 API），支持直接返图或返回 JSON（自动识别 url/imgurl/image 字段），保存后刷新页面生效。留空则禁用背景图，仅显示渐变底色；侧边栏底部也可随时开关背景图。
         </p>
       </div>
     </div>
@@ -1240,7 +1241,7 @@ const App = {
   template: `
     <div class="bk-layout">
       <!-- 随机二次元背景 -->
-      <div class="bg-stage" aria-hidden="true">
+      <div v-if="bgEnabled" class="bg-stage" aria-hidden="true">
         <div class="bg-layer" :class="{ on: bgLayerIdx === 0, kenburns: bgLayerIdx === 0 }" :style="bgStyle(0)"></div>
         <div class="bg-layer" :class="{ on: bgLayerIdx === 1, kenburns: bgLayerIdx === 1 }" :style="bgStyle(1)"></div>
         <div class="bg-vignette"></div>
@@ -1251,7 +1252,7 @@ const App = {
         <div class="bk-logo">
           <div class="logo-icon"><el-icon :size="24"><Notebook /></el-icon></div>
           <div class="logo-text">
-            <b>智能记账</b>
+            <b>AI的小账本</b>
             <span>All-in-AI · Liquid Glass</span>
           </div>
         </div>
@@ -1263,6 +1264,10 @@ const App = {
           </div>
         </nav>
         <div class="bk-sidebar-footer">
+          <button class="bk-theme-btn" @click="toggleBgEnabled" :title="bgEnabled ? '关闭背景图' : '开启背景图'">
+            <el-icon :size="18"><component :is="bgEnabled ? 'PictureFilled' : 'Picture'" /></el-icon>
+            <span>{{ bgEnabled ? '背景图：开' : '背景图：关' }}</span>
+          </button>
           <button class="bk-theme-btn" @click="toggleTheme">
             <el-icon :size="18"><component :is="theme==='dark' ? 'Sunny' : 'Moon'" /></el-icon>
             <span>{{ theme==='dark' ? '浅色模式' : '深色模式' }}</span>
@@ -1277,7 +1282,7 @@ const App = {
             <span>{{ currentMenu.label }}</span>
           </div>
           <div class="actions">
-            <button class="pill-btn" @click="nextBg" title="切换二次元背景">
+            <button v-if="bgEnabled" class="pill-btn" @click="nextBg" title="切换二次元背景">
               <el-icon :size="15"><Picture /></el-icon><span class="pill-text">换背景</span>
             </button>
             <button class="pill-btn" @click="refresh" title="刷新当前页面">
@@ -1310,6 +1315,24 @@ const App = {
     const bgLayerIdx = ref(0);
     let bgTimer = null;
     let bgLoading = false;
+    /* 背景开关：手动关闭，或未配置任何图片 API 时自动禁用 */
+    const bgEnabled = ref(
+      safeStorage.getItem("bk-bg-enabled") !== "0" &&
+      parseBgSources(window.__bookkeeping_config__?.anime_bg_api).length > 0
+    );
+
+    function toggleBgEnabled() {
+      bgEnabled.value = !bgEnabled.value;
+      safeStorage.setItem("bk-bg-enabled", bgEnabled.value ? "1" : "0");
+      if (bgEnabled.value) {
+        nextBg();
+        if (!bgTimer) bgTimer = setInterval(() => { nextBg(); }, 60000);
+      } else {
+        if (bgTimer) { clearInterval(bgTimer); bgTimer = null; }
+        bgUrls.value = ["", ""];
+        bgLayerIdx.value = 0;
+      }
+    }
 
     const currentMenu = computed(() => menus.find(m => m.key === active.value) || menus[0]);
     const currentView = computed(() => {
@@ -1331,7 +1354,7 @@ const App = {
 
     /* 拉取并淡入一张新二次元壁纸 */
     async function nextBg() {
-      if (bgLoading) return;
+      if (!bgEnabled.value || bgLoading) return;
       bgLoading = true;
       try {
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -1361,15 +1384,17 @@ const App = {
 
     onMounted(() => {
       document.documentElement.setAttribute("data-theme", theme.value);
-      nextBg();
-      // 每 60s 自动切换一次二次元背景
-      bgTimer = setInterval(() => { nextBg(); }, 60000);
+      if (bgEnabled.value) {
+        nextBg();
+        // 每 60s 自动切换一次二次元背景
+        bgTimer = setInterval(() => { nextBg(); }, 60000);
+      }
     });
     onUnmounted(() => { if (bgTimer) clearInterval(bgTimer); });
 
     return {
       menus, active, theme, viewRef, currentMenu, currentView,
-      bgUrls, bgLayerIdx, bgStyle, nextBg,
+      bgUrls, bgLayerIdx, bgStyle, nextBg, bgEnabled, toggleBgEnabled,
       toggleTheme, onNavigate, refresh
     };
   }

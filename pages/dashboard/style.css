@@ -82,12 +82,12 @@
 html { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
 body {
-  /* 兜底背景：壁纸 API 不可用时也有漂亮的渐变 */
+  /* 兜底背景：壁纸 API 不可用时也有漂亮的渐变（雾蓝樱粉） */
   background:
-    radial-gradient(120% 100% at 10% 0%, #6a5af8 0%, transparent 55%),
-    radial-gradient(120% 100% at 100% 15%, #f06292 0%, transparent 55%),
-    radial-gradient(100% 120% at 50% 100%, #0a84ff 0%, transparent 60%),
-    linear-gradient(160deg, #12162b 0%, #1d1f45 60%, #2a2250 100%);
+    radial-gradient(120% 100% at 10% 0%, #5b83b8 0%, transparent 55%),
+    radial-gradient(120% 100% at 100% 15%, #ffd4ea 0%, transparent 55%),
+    radial-gradient(100% 120% at 50% 100%, #9db4d8 0%, transparent 60%),
+    linear-gradient(160deg, #5b83b8 0%, #9db4d8 60%, #ffd4ea 100%);
   color: var(--bk-text);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
     "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
@@ -99,9 +99,9 @@ body {
 
 [data-theme="dark"] body {
   background:
-    radial-gradient(120% 100% at 10% 0%, rgba(106,90,248,0.5) 0%, transparent 55%),
-    radial-gradient(120% 100% at 100% 15%, rgba(240,98,146,0.4) 0%, transparent 55%),
-    radial-gradient(100% 120% at 50% 100%, rgba(10,132,255,0.4) 0%, transparent 60%),
+    radial-gradient(120% 100% at 10% 0%, rgba(91,131,184,0.45) 0%, transparent 55%),
+    radial-gradient(120% 100% at 100% 15%, rgba(255,212,234,0.22) 0%, transparent 55%),
+    radial-gradient(100% 120% at 50% 100%, rgba(157,180,216,0.35) 0%, transparent 60%),
     linear-gradient(160deg, #0b0d18 0%, #141731 60%, #1d1734 100%);
 }
 
@@ -1163,7 +1163,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 14px;
-  background: linear-gradient(160deg, #0A84FF 0%, #7A5AF8 45%, #F06292 100%);
+  background: linear-gradient(160deg, #5b83b8 0%, #9db4d8 45%, #ffd4ea 100%);
   transition: opacity 0.6s var(--ease-out), visibility 0.6s;
 }
 #splash.hide { opacity: 0; visibility: hidden; }
@@ -1185,13 +1185,13 @@ body {
 .splash-name {
   font-size: 22px;
   font-weight: 700;
-  color: #fff;
+  color: #2c3a5c;
   letter-spacing: 1px;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  text-shadow: 0 1px 8px rgba(255,255,255,0.35);
 }
 .splash-hint {
   font-size: 12px;
-  color: rgba(255,255,255,0.75);
+  color: rgba(44,58,92,0.65);
   letter-spacing: 2.5px;
   text-transform: uppercase;
 }
