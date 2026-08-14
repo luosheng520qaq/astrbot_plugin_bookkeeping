@@ -353,6 +353,20 @@ body {
 }
 [data-theme="dark"] .bk-theme-btn:hover { background: rgba(255,255,255,0.09); }
 
+/* ---------- 主题切换遮罩动画（从按钮位置蔓延全屏） ---------- */
+.theme-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  clip-path: circle(0px at 50% 50%);
+  transition:
+    clip-path 0.62s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.62s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: clip-path, opacity;
+}
+
 /* ==========================================================================
    主区域
    ========================================================================== */

@@ -1477,13 +1477,13 @@ const App = {
           clipPath: `circle(${radius}px at ${x}px ${y}px)`,
           opacity: 0,
         };
-      }, 680);
+      }, 660);
 
       // 动画结束，清理
       setTimeout(() => {
         themeMaskStyle.value = {};
         themeAnimating = false;
-      }, 1150);
+      }, 1320);
     }
     function onNavigate(key) { active.value = key; }
     function refresh() {
@@ -1511,7 +1511,7 @@ const App = {
       menus, active, theme, viewRef, currentMenu, currentView,
       bgUrls, bgLayerIdx, bgStyle, nextBg, bgEnabled, toggleBgEnabled,
       menuRef, menuSliderStyle, setMenuItemEl,
-      toggleTheme, onNavigate, refresh
+      themeBtnRef, themeMaskStyle, toggleTheme, onNavigate, refresh
     };
   }
 };
