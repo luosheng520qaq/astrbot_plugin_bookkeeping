@@ -1173,7 +1173,7 @@ const SettingsView = {
       <div class="bk-card bk-settings-card">
         <div class="settings-title"><el-icon class="title-ico"><MagicStick /></el-icon>使用提示</div>
         <p class="bk-settings-tip">
-          本插件以 <b>All-in-AI</b> 为设计理念，提供 20+ 个 LLM 工具。在聊天窗口直接用自然语言描述需求即可：
+          本插件提供 20+ 个 LLM 工具。在聊天窗口直接用自然语言描述需求即可：
         </p>
         <ul class="bk-settings-tip">
           <li>"记一笔 餐饮 50 午餐" / "工资到账 8000"</li>
@@ -1253,7 +1253,6 @@ const App = {
           <div class="logo-icon"><el-icon :size="24"><Notebook /></el-icon></div>
           <div class="logo-text">
             <b>AI的小账本</b>
-            <span>All-in-AI · Liquid Glass</span>
           </div>
         </div>
         <nav class="bk-menu">
