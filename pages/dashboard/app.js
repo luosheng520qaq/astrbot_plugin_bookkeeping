@@ -605,6 +605,11 @@ const TransactionsView = {
               <span v-if="row.type==='transfer' && row.to_account_name" class="bk-list-sub"> → {{ row.to_account_name }}</span>
             </template>
           </el-table-column>
+          <el-table-column label="账户余额" min-width="140">
+            <template #default="{row}">
+              <span :style="{color: Number(row.balance_after) >= 0 ? typeColor('income') : typeColor('expense'), fontWeight:600, fontVariantNumeric:'tabular-nums'}">{{ fmtMoney(row.balance_after) }}</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="note" label="备注" min-width="200" show-overflow-tooltip />
           <el-table-column label="日期" min-width="160">
             <template #default="{row}"><span style="font-variant-numeric:tabular-nums; white-space:nowrap">{{ row.tx_date }} {{ (row.tx_time||'').slice(0,5) }}</span></template>

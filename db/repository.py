@@ -182,7 +182,7 @@ class Repository:
             return None
         tx = _row_to_dict(row)
         tx["tags"] = await self._get_tx_tags(tx_id)
-        return tx
+        return (await self._attach_balance_after([tx]))[0]
 
     async def _get_tx_tags(self, tx_id: int) -> list[str]:
         rows = await self.db.fetchall(
@@ -278,7 +278,48 @@ class Repository:
                 continue
             tx["tags"] = tags_map.get(tid, [])
             result.append(tx)
-        return result
+        return await self._attach_balance_after(result)
+
+    async def _attach_balance_after(self, txs: list[dict]) -> list[dict]:
+        """为每笔交易动态计算其所属账户在交易后的余额，写入 balance_after 字段。
+
+        原理：余额(交易后) = 账户当前余额 - 该账户在此交易之后所有动账的净影响。
+        - 支出/转出（account_id）：余额 -amount
+        - 收入（account_id）：余额 +amount
+        - 转入（to_account_id）：余额 +amount
+        用「当前余额」倒推而非从初始余额正推，可保证对账（直接改余额）后依然准确。
+        """
+        if not txs:
+            return txs
+        ids = [t["id"] for t in txs]
+        placeholders = ",".join("?" * len(ids))
+        rows = await self.db.fetchall(
+            f"""SELECT t.id,
+                       a.balance AS current_balance,
+                       COALESCE(SUM(
+                           CASE
+                             WHEN u.account_id = a.id AND u.type = 'income' THEN u.amount
+                             WHEN u.account_id = a.id THEN -u.amount
+                             WHEN u.to_account_id = a.id THEN u.amount
+                             ELSE 0
+                           END
+                       ), 0) AS later_effect
+                FROM transactions t
+                JOIN accounts a ON a.id = t.account_id
+                LEFT JOIN transactions u
+                       ON (u.account_id = a.id OR u.to_account_id = a.id)
+                      AND (u.tx_date > t.tx_date
+                           OR (u.tx_date = t.tx_date
+                               AND (u.tx_time > t.tx_time
+                                    OR (u.tx_time = t.tx_time AND u.id > t.id))))
+                WHERE t.id IN ({placeholders})
+                GROUP BY t.id, a.id""",
+            ids,
+        )
+        m = {r["id"]: float(r["current_balance"]) - float(r["later_effect"]) for r in rows}
+        for tx in txs:
+            tx["balance_after"] = round(m.get(tx["id"], 0.0), 2)
+        return txs
 
     async def list_transactions(
         self,
@@ -596,14 +637,16 @@ class Repository:
     async def export_transactions_csv(self, transactions: list[dict]) -> str:
         buf = io.StringIO()
         writer = csv.writer(buf)
-        writer.writerow(["id", "type", "amount", "category", "account", "to_account", "note", "date", "time", "tags"])
+        writer.writerow(["交易ID", "类型", "金额", "分类", "账户", "转入账户", "账户余额", "日期", "时间", "备注", "标签"])
+        type_label = {"expense": "支出", "income": "收入", "transfer": "转账"}
         for tx in transactions:
             writer.writerow([
-                tx.get("id", ""), tx.get("type", ""), tx.get("amount", 0),
-                tx.get("category_name", "") or "", tx.get("account_name", "") or "",
-                tx.get("to_account_name", "") or "", tx.get("note", "") or "",
+                tx.get("id", ""), type_label.get(tx.get("type"), tx.get("type", "")),
+                tx.get("amount", 0), tx.get("category_name", "") or "",
+                tx.get("account_name", "") or "", tx.get("to_account_name", "") or "",
+                tx.get("balance_after", 0),
                 tx.get("tx_date", ""), tx.get("tx_time", ""),
-                "|".join(tx.get("tags", [])),
+                tx.get("note", "") or "", "|".join(tx.get("tags", [])),
             ])
         return buf.getvalue()
 
