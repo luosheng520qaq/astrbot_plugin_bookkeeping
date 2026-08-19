@@ -4,7 +4,9 @@
  * 特色：随机二次元壁纸背景 + 玻璃拟态 + 弹性动效
  * ============================================================ */
 
-const { createApp, ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
+import { LiquidGlass } from "./liquidGlass.js";
+
+const { createApp, ref, reactive, computed, onMounted, onUnmounted, watch, nextTick, provide, inject } = Vue;
 const ElMessage = ElementPlus.ElMessage;
 const ElMessageBox = ElementPlus.ElMessageBox;
 
@@ -1198,6 +1200,10 @@ const SettingsView = {
             </div>
             <span v-else>未配置（不显示背景图，使用渐变底色）</span>
           </el-descriptions-item>
+          <el-descriptions-item label="当前背景图">
+            <span v-if="wallpaperUrl" style="word-break:break-all">{{ wallpaperUrl }}</span>
+            <span v-else>未启用壁纸</span>
+          </el-descriptions-item>
         </el-descriptions>
         <div class="bk-export-btns">
           <button class="pill-btn danger" @click="exportJson"><el-icon><Download /></el-icon>导出全部数据 (JSON)</button>
@@ -1224,6 +1230,7 @@ const SettingsView = {
   `,
   setup() {
     const config = ref({});
+    const wallpaperUrl = inject("wallpaperUrl", ref(""));
     // 背景 API 配置兼容两种存储格式：
     //  - list 类型（新）：字符串数组
     //  - string 类型（旧）：逗号分隔
@@ -1261,7 +1268,7 @@ const SettingsView = {
         ElMessage.error("导出失败：" + (e.message || e));
       }
     }
-    return { config, bgApiList, exportJson, exportCsv };
+    return { config, bgApiList, wallpaperUrl, exportJson, exportCsv };
   }
 };
 
@@ -1320,8 +1327,12 @@ const App = {
             <span>{{ currentMenu.label }}</span>
           </div>
           <div class="actions">
-            <button v-if="bgEnabled" class="pill-btn" @click="nextBg" title="切换二次元背景">
+            <button v-if="bgEnabled" class="pill-btn" @click="nextBg" title="换一张壁纸">
               <el-icon :size="15"><Picture /></el-icon><span class="pill-text">换背景</span>
+            </button>
+            <button class="pill-btn" @click="toggleBgEnabled" :title="bgEnabled ? '关闭背景图' : '开启背景图'">
+              <el-icon :size="15"><component :is="bgEnabled ? 'PictureFilled' : 'Picture'" /></el-icon>
+              <span class="pill-text">{{ bgEnabled ? '关闭壁纸' : '开启壁纸' }}</span>
             </button>
             <button class="pill-btn" @click="refresh" title="刷新当前页面">
               <el-icon :size="15"><Refresh /></el-icon><span class="pill-text">刷新</span>
@@ -1332,6 +1343,11 @@ const App = {
           <component :is="currentView" :key="active" ref="viewRef" @navigate="onNavigate" />
         </section>
       </main>
+
+      <!-- 壁纸 CORS 状态标注（右下角，极简不突兀） -->
+      <div v-if="lgActive && bgEnabled && wallpaperCors !== 'off'" class="bk-cors-hint" :class="wallpaperCors">
+        <span class="bk-cors-dot"></span>{{ corsHintText }}
+      </div>
     </div>
   `,
   setup() {
@@ -1370,8 +1386,10 @@ const App = {
     /* ---- 动漫背景状态 ---- */
     const bgUrls = ref(["", ""]);
     const bgLayerIdx = ref(0);
-    let bgTimer = null;
     let bgLoading = false;
+    let lg = null; // 真液体玻璃 WebGL 引擎实例
+    const lgActive = ref(false);        // WebGL 引擎是否激活
+    const wallpaperCors = ref("off");   // off | loading | ok | nocors
     /* 背景开关：手动关闭，或未配置任何图片 API 时自动禁用 */
     const bgEnabled = ref(
       safeStorage.getItem("bk-bg-enabled") !== "0" &&
@@ -1382,12 +1400,12 @@ const App = {
       bgEnabled.value = !bgEnabled.value;
       safeStorage.setItem("bk-bg-enabled", bgEnabled.value ? "1" : "0");
       if (bgEnabled.value) {
-        nextBg();
-        if (!bgTimer) bgTimer = setInterval(() => { nextBg(); }, 60000);
+        nextBg(); // 开启时手动随机换一张，不做自动轮播
       } else {
-        if (bgTimer) { clearInterval(bgTimer); bgTimer = null; }
         bgUrls.value = ["", ""];
         bgLayerIdx.value = 0;
+        wallpaperCors.value = "off";
+        lg && lg.setWallpaper(null); // 关闭壁纸：引擎回退为渐变背景
       }
     }
 
@@ -1403,6 +1421,18 @@ const App = {
         default: return "DashboardView";
       }
     });
+
+    // 壁纸 CORS 状态标注文案
+    const corsHintText = computed(() => ({
+      loading: "壁纸加载中…",
+      ok: "壁纸 · 有 CORS",
+      nocors: "壁纸 · 无 CORS",
+      off: "",
+    })[wallpaperCors.value] || "");
+
+    // 当前显示壁纸的 URL（供设置页展示）
+    const currentWallpaperUrl = computed(() => bgUrls.value[bgLayerIdx.value] || "");
+    provide("wallpaperUrl", currentWallpaperUrl);
 
     function bgStyle(i) {
       const v = bgUrls.value[i];
@@ -1420,6 +1450,10 @@ const App = {
             const target = 1 - bgLayerIdx.value;
             bgUrls.value[target] = url;
             bgLayerIdx.value = target;
+            if (lg) {
+              wallpaperCors.value = "loading";
+              lg.setWallpaper(url); // 同步壁纸给 WebGL 引擎（需 CORS）
+            }
             return;
           }
         }
@@ -1501,20 +1535,42 @@ const App = {
       document.documentElement.setAttribute("data-theme", theme.value);
       updateMenuSlider();
       window.addEventListener("resize", updateMenuSlider);
+
+      // 初始化真液体玻璃 WebGL 引擎（失败则自动回退 CSS 毛玻璃）
+      try {
+        lg = new LiquidGlass({
+          selector: ".bk-sidebar, .bk-topbar, .bk-card",
+          gradient: ["#5b83b8", "#9db4d8", "#ffd4ea"],
+          onWallpaperLoad: () => { wallpaperCors.value = "ok"; },
+          onWallpaperError: () => { wallpaperCors.value = "nocors"; },
+        });
+        if (lg.mount(document.body)) {
+          document.documentElement.classList.add("lg-active");
+          lgActive.value = true;
+        } else {
+          lg = null;
+        }
+      } catch (e) {
+        console.warn("[LiquidGlass] 引擎初始化失败，回退 CSS 毛玻璃", e);
+        lg = null;
+      }
+
       if (bgEnabled.value) {
-        nextBg();
-        // 每 60s 自动切换一次二次元背景
-        bgTimer = setInterval(() => { nextBg(); }, 60000);
+        nextBg(); // 初始随机加载一张壁纸
       }
     });
     onUnmounted(() => {
-      if (bgTimer) clearInterval(bgTimer);
       window.removeEventListener("resize", updateMenuSlider);
+      if (lg) { lg.destroy(); lg = null; }
+      document.documentElement.classList.remove("lg-active");
+      lgActive.value = false;
+      wallpaperCors.value = "off";
     });
 
     return {
       menus, active, theme, viewRef, currentMenu, currentView,
       bgUrls, bgLayerIdx, bgStyle, nextBg, bgEnabled, toggleBgEnabled,
+      lgActive, wallpaperCors, corsHintText,
       menuRef, menuSliderStyle, setMenuItemEl,
       themeBtnRef, themeMaskStyle, toggleTheme, onNavigate, refresh
     };

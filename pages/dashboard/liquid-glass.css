@@ -1,0 +1,59 @@
+/* ==========================================================================
+   liquid-glass.css — iOS 真液体玻璃（WebGL 折射）样式补丁
+   ----------------------------------------------------------
+   仅当 <html> 存在 .lg-active 类（即 WebGL 引擎 mount 成功）时生效。
+   WebGL 不可用时，此类不存在，页面自动回退到 style.css 的 CSS 毛玻璃。
+   ========================================================================== */
+
+/* WebGL 渲染层：固定全屏，位于背景之上、内容之下，不拦截交互 */
+.lg-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   引擎接管背景后：隐藏 DOM 壁纸层（壁纸改由 WebGL 绘制渐变 + 壁纸），
+   但保留暗角 / 顶部光晕作为装饰层，并调整分层：
+     WebGL(0) < 暗角/光晕(1) < 内容(2)
+   ========================================================================== */
+html.lg-active .bg-layer {
+  display: none;
+}
+html.lg-active .bg-stage {
+  z-index: 1;
+}
+html.lg-active .bk-layout {
+  z-index: 2;
+}
+
+/* ==========================================================================
+   关闭大型玻璃表面的 CSS backdrop-filter（改由 WebGL 折射承担模糊/畸变），
+   并降低底色不透明度，让底层折射透出。小型控件（按钮/下拉/输入框）保留原样。
+   ========================================================================== */
+html.lg-active .bk-sidebar,
+html.lg-active .bk-topbar,
+html.lg-active .bk-card,
+html.lg-active .bk-glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* 浅色主题：更通透，露出 WebGL 折射 */
+html.lg-active {
+  --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.26));
+  --glass-bg-strong: linear-gradient(135deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.40));
+}
+
+/* 深色主题：保持深色玻璃底，露出折射 */
+html.lg-active[data-theme="dark"] {
+  --glass-bg: linear-gradient(135deg, rgba(44, 46, 60, 0.62), rgba(28, 30, 40, 0.38));
+  --glass-bg-strong: linear-gradient(135deg, rgba(60, 62, 82, 0.68), rgba(36, 38, 52, 0.46));
+}
+
+/* ==========================================================================
+   无 WebGL 降级回退：保持 style.css 原有的 backdrop-filter 毛玻璃
+   （默认即如此，无需额外规则；此块仅作语义说明）
+   ========================================================================== */
