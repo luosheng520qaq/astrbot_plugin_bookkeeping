@@ -577,7 +577,7 @@ const TransactionsView = {
           <el-select v-model="filter.type" placeholder="类型" clearable style="width:110px">
             <el-option label="支出" value="expense" /><el-option label="收入" value="income" /><el-option label="转账" value="transfer" />
           </el-select>
-          <el-select v-model="filter.category_id" placeholder="分类" clearable filterable style="width:130px">
+          <el-select v-model="filter.category_id" placeholder="分类" clearable :filterable="!isMobileView" style="width:130px">
             <el-option v-for="c in categories" :key="c.id" :label="(c.icon||'')+' '+c.name" :value="c.id" />
           </el-select>
           <el-select v-model="filter.account_id" placeholder="账户" clearable style="width:130px">
@@ -646,17 +646,17 @@ const TransactionsView = {
             <el-input-number v-model="dialog.form.amount" :min="0.01" :precision="2" :step="10" style="width:200px" />
           </el-form-item>
           <el-form-item label="分类" v-if="dialog.form.type!=='transfer'">
-            <el-select v-model="dialog.form.category_id" clearable filterable allow-create style="width:100%">
+            <el-select v-model="dialog.form.category_id" clearable :filterable="!isMobileView" :allow-create="!isMobileView" style="width:100%">
               <el-option v-for="c in filteredCats" :key="c.id" :label="(c.icon||'')+' '+c.name" :value="c.id" />
             </el-select>
           </el-form-item>
           <el-form-item label="账户">
-            <el-select v-model="dialog.form.account_id" filterable style="width:100%">
+            <el-select v-model="dialog.form.account_id" :filterable="!isMobileView" style="width:100%">
               <el-option v-for="a in accounts" :key="a.id" :label="a.name+' ('+(accTypeLabel[a.type]||a.type)+')'" :value="a.id" />
             </el-select>
           </el-form-item>
           <el-form-item label="转入账户" v-if="dialog.form.type==='transfer'">
-            <el-select v-model="dialog.form.to_account_id" filterable style="width:100%">
+            <el-select v-model="dialog.form.to_account_id" :filterable="!isMobileView" style="width:100%">
               <el-option v-for="a in accounts" :key="a.id" :label="a.name" :value="a.id" />
             </el-select>
           </el-form-item>
@@ -1607,6 +1607,37 @@ const App = {
     app.component(key, comp);
   }
   app.mount("#app");
+
+  /* ============================================================
+   * 移动端 el-select 键盘弹起双重保险
+   * Element Plus 的 filterable el-select 会动态生成 <input class="el-select__input">，
+   * 即使 CSS 禁用了 pointer-events，某些安卓浏览器仍会在点击时聚焦。
+   * 这里用 MutationObserver 监听 DOM 变化，一旦移动端出现该类 input，
+   * 立刻打上 readonly + inputmode=none + disabled 式属性，阻止软键盘弹起。
+   * ============================================================ */
+  if (isMobileView.value || /Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+    const patchSelectInput = (el) => {
+      el.setAttribute("readonly", "true");
+      el.setAttribute("inputmode", "none");
+      el.setAttribute("autocomplete", "off");
+      el.setAttribute("autocorrect", "off");
+      el.setAttribute("autocapitalize", "off");
+      el.setAttribute("spellcheck", "false");
+      el.style.pointerEvents = "none";
+    };
+    const run = () => {
+      document.querySelectorAll(".el-select__input").forEach(patchSelectInput);
+    };
+    run();
+    const mo = new MutationObserver(() => run());
+    mo.observe(document.body, { childList: true, subtree: true, attributes: false });
+    window.addEventListener("focusin", (e) => {
+      if (e.target && e.target.classList && e.target.classList.contains("el-select__input")) {
+        patchSelectInput(e.target);
+        e.target.blur();
+      }
+    });
+  }
 
   // 隐藏启动加载屏
   const splash = document.getElementById("splash");

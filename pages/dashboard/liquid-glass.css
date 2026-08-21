@@ -15,15 +15,15 @@
 }
 
 /* ==========================================================================
-   引擎接管背景后：隐藏 DOM 壁纸层（壁纸改由 WebGL 绘制渐变 + 壁纸），
-   但保留暗角 / 顶部光晕作为装饰层，并调整分层：
-     WebGL(0) < 暗角/光晕(1) < 内容(2)
+   引擎接管背景后：隐藏 DOM 壁纸层与暗角/光晕装饰层。
+   壁纸/渐变已由 WebGL 全屏绘制；若再叠加 .bg-vignette（底部渐黑）
+   与 .bg-aura（顶部光晕），会在壁纸上形成“下半部分黑色蒙版”的观感，
+   故在 WebGL 模式下全部隐藏。分层：WebGL(0) < 内容(2)
    ========================================================================== */
-html.lg-active .bg-layer {
+html.lg-active .bg-layer,
+html.lg-active .bg-vignette,
+html.lg-active .bg-aura {
   display: none;
-}
-html.lg-active .bg-stage {
-  z-index: 1;
 }
 html.lg-active .bk-layout {
   z-index: 2;
