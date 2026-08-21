@@ -70,12 +70,12 @@ class Repository:
         cur = await self.db.execute(
             """INSERT INTO transactions(type, amount, category_id, account_id, to_account_id, note, tx_date, tx_time)
                VALUES(?,?,?,?,?,?,?,?)""",
-            (type_, amount, category_id, account_id, to_account_id, note, tx_date, tx_time),
+            (type_, round(float(amount), 2), category_id, account_id, to_account_id, note, tx_date, tx_time),
         )
         tx_id = cur.lastrowid
 
         # 更新账户余额
-        await self._apply_transaction_balance(type_, amount, account_id, to_account_id)
+        await self._apply_transaction_balance(type_, round(float(amount), 2), account_id, to_account_id)
 
         # 关联标签
         if tag_names:
@@ -89,23 +89,25 @@ class Repository:
     async def _apply_transaction_balance(
         self, type_: str, amount: float, account_id: int, to_account_id: Optional[int]
     ) -> None:
+        # 每次余额运算都用 round(..., 2) 收敛到 2 位小数，
+        # 避免浮点误差（如 100-9.02=90.97999999999999）在余额上累积。
         if type_ == "expense":
             await self.db.execute(
-                "UPDATE accounts SET balance=balance-?, updated_at=datetime('now') WHERE id=?",
+                "UPDATE accounts SET balance=round(balance-?, 2), updated_at=datetime('now') WHERE id=?",
                 (amount, account_id),
             )
         elif type_ == "income":
             await self.db.execute(
-                "UPDATE accounts SET balance=balance+?, updated_at=datetime('now') WHERE id=?",
+                "UPDATE accounts SET balance=round(balance+?, 2), updated_at=datetime('now') WHERE id=?",
                 (amount, account_id),
             )
         elif type_ == "transfer":
             await self.db.execute(
-                "UPDATE accounts SET balance=balance-?, updated_at=datetime('now') WHERE id=?",
+                "UPDATE accounts SET balance=round(balance-?, 2), updated_at=datetime('now') WHERE id=?",
                 (amount, account_id),
             )
             await self.db.execute(
-                "UPDATE accounts SET balance=balance+?, updated_at=datetime('now') WHERE id=?",
+                "UPDATE accounts SET balance=round(balance+?, 2), updated_at=datetime('now') WHERE id=?",
                 (amount, to_account_id),
             )
 
@@ -116,13 +118,13 @@ class Repository:
         aid = tx["account_id"]
         to_aid = tx.get("to_account_id")
         if t == "expense":
-            await self.db.execute("UPDATE accounts SET balance=balance+? WHERE id=?", (amt, aid))
+            await self.db.execute("UPDATE accounts SET balance=round(balance+?, 2) WHERE id=?", (amt, aid))
         elif t == "income":
-            await self.db.execute("UPDATE accounts SET balance=balance-? WHERE id=?", (amt, aid))
+            await self.db.execute("UPDATE accounts SET balance=round(balance-?, 2) WHERE id=?", (amt, aid))
         elif t == "transfer":
-            await self.db.execute("UPDATE accounts SET balance=balance+? WHERE id=?", (amt, aid))
+            await self.db.execute("UPDATE accounts SET balance=round(balance+?, 2) WHERE id=?", (amt, aid))
             if to_aid:
-                await self.db.execute("UPDATE accounts SET balance=balance-? WHERE id=?", (amt, to_aid))
+                await self.db.execute("UPDATE accounts SET balance=round(balance-?, 2) WHERE id=?", (amt, to_aid))
 
     async def update_transaction(self, tx_id: int, **fields) -> Optional[dict]:
         tx = await self.get_transaction(tx_id)
@@ -131,17 +133,19 @@ class Repository:
 
         # 处理余额回滚与重新应用
         new_type = fields.get("type", tx["type"])
-        new_amount = float(fields.get("amount", tx["amount"]))
+        new_amount = round(float(fields.get("amount", tx["amount"])), 2)
         new_account_id = fields.get("account_id", tx["account_id"])
         new_to_account = fields.get("to_account_id", tx.get("to_account_id"))
 
         await self._revert_transaction_balance(tx)
 
-        # 更新字段
+        # 更新字段（金额写入时同样收敛到 2 位小数）
         allowed = {"type", "amount", "category_id", "account_id", "to_account_id", "note", "tx_date", "tx_time"}
         sets, vals = [], []
         for k, v in fields.items():
             if k in allowed:
+                if k == "amount" and v is not None:
+                    v = round(float(v), 2)
                 sets.append(f"{k}=?")
                 vals.append(v)
         if sets:
@@ -394,7 +398,7 @@ class Repository:
     async def add_account(self, name: str, type_: str, balance: float = 0, note: str = "") -> dict:
         cur = await self.db.execute(
             "INSERT INTO accounts(name, type, balance, note) VALUES(?,?,?,?)",
-            (name, type_, balance, note),
+            (name, type_, round(float(balance), 2), note),
         )
         return await self.get_account(cur.lastrowid) or {"id": cur.lastrowid, "name": name}
 
@@ -418,7 +422,8 @@ class Repository:
         acc = await self.get_account(account_id)
         if not acc:
             return None
-        old_balance = float(acc["balance"])
+        old_balance = round(float(acc["balance"]), 2)
+        new_balance = round(float(new_balance), 2)
         await self.db.execute(
             "UPDATE accounts SET balance=?, updated_at=datetime('now') WHERE id=?",
             (new_balance, account_id),
@@ -426,7 +431,7 @@ class Repository:
         # 记录对账流水，避免"备注丢失"；历史上已对账过的不补记
         await self.db.execute(
             "INSERT INTO balance_adjustments(account_id, old_balance, new_balance, note) VALUES(?,?,?,?)",
-            (account_id, old_balance, float(new_balance), note or ""),
+            (account_id, old_balance, new_balance, note or ""),
         )
         return await self.get_account(account_id)
 
@@ -535,12 +540,12 @@ class Repository:
                 FROM transactions WHERE 1=1 {where}""",
             params,
         )
-        expense = float(row["total_expense"]) if row else 0
-        income = float(row["total_income"]) if row else 0
+        expense = round(float(row["total_expense"]), 2) if row else 0
+        income = round(float(row["total_income"]), 2) if row else 0
         return {
             "total_expense": expense,
             "total_income": income,
-            "balance": income - expense,
+            "balance": round(income - expense, 2),
             "tx_count": row["tx_count"] if row else 0,
             "start_date": start_date,
             "end_date": end_date,

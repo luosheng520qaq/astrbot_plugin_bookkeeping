@@ -123,7 +123,20 @@ class Database:
             "DELETE FROM transaction_tags WHERE transaction_id NOT IN (SELECT id FROM transactions)"
         )
         await self._seed_defaults()
+        await self._cleanup_float_precision()
         await self._conn.commit()
+
+    async def _cleanup_float_precision(self) -> None:
+        """幂等清洗历史浮点误差：把 90.97999999999999 这类余额/金额收敛到 2 位小数。
+
+        只更新确实存在误差的行（round(balance,2) != balance），对已精确的值无副作用。
+        """
+        await self._conn.execute(
+            "UPDATE accounts SET balance = round(balance, 2) WHERE round(balance, 2) != balance"
+        )
+        await self._conn.execute(
+            "UPDATE transactions SET amount = round(amount, 2) WHERE round(amount, 2) != amount"
+        )
 
     async def _seed_defaults(self) -> None:
         # 分类
