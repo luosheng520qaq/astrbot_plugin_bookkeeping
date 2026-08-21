@@ -43,14 +43,14 @@ html.lg-active .bk-glass {
 
 /* 浅色主题：更通透，露出 WebGL 折射 */
 html.lg-active {
-  --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.26));
-  --glass-bg-strong: linear-gradient(135deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.40));
+  --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.40), rgba(255, 255, 255, 0.16));
+  --glass-bg-strong: linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.30));
 }
 
 /* 深色主题：保持深色玻璃底，露出折射 */
 html.lg-active[data-theme="dark"] {
-  --glass-bg: linear-gradient(135deg, rgba(44, 46, 60, 0.62), rgba(28, 30, 40, 0.38));
-  --glass-bg-strong: linear-gradient(135deg, rgba(60, 62, 82, 0.68), rgba(36, 38, 52, 0.46));
+  --glass-bg: linear-gradient(135deg, rgba(44, 46, 60, 0.50), rgba(28, 30, 40, 0.28));
+  --glass-bg-strong: linear-gradient(135deg, rgba(60, 62, 82, 0.60), rgba(36, 38, 52, 0.38));
 }
 
 /* ==========================================================================
