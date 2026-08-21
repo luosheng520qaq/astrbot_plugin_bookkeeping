@@ -45,6 +45,43 @@ def _summary_text(s: dict, currency: str = "¥") -> str:
     )
 
 
+def _resolve_account(
+    accounts: list[dict],
+    name: Optional[str] = None,
+    account_id: Optional[int] = None,
+) -> Optional[dict]:
+    """按账户 ID（优先）或名称解析账户。
+
+    - account_id 有效时优先按 ID 匹配（兼容模型把 ID 传成字符串）。
+    - 否则按名称精确匹配；名称是纯数字时也尝试当作 ID 匹配（兼容旧行为）。
+    """
+    if account_id not in (None, "", 0):
+        try:
+            aid = int(account_id)
+        except (TypeError, ValueError):
+            aid = None
+        if aid is not None:
+            for a in accounts:
+                if a["id"] == aid:
+                    return a
+            return None
+    if name:
+        name_s = str(name).strip()
+        for a in accounts:
+            if a["name"] == name_s:
+                return a
+        if name_s.isdigit():
+            for a in accounts:
+                if str(a["id"]) == name_s:
+                    return a
+    return None
+
+
+def _accounts_hint(accounts: list[dict]) -> str:
+    """账户列表提示（含 ID），用于报错时引导模型使用 ID。"""
+    return "、".join(f"{a['name']}(id={a['id']})" for a in accounts)
+
+
 def register_llm_tools(plugin_cls, repo_holder, config_holder):
     """在插件类上注册全部 LLM 工具。
 
@@ -67,7 +104,8 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
         type: str,
         amount: float,
         category: str,
-        account: str,
+        account: str = "",
+        account_id: int = 0,
         note: str = "",
         date: str = "",
         time: str = "",
@@ -76,13 +114,15 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
         """记录一笔账目（支出/收入/转账）。优先调用此工具完成记账。
 
         适用场景：用户说"记账/记一笔/花了/收入/进账/转账"等。
-        金额必须为正数；转账 type=transfer 时 account 表示转出账户，可额外用 to_account 指定转入账户（或省略，将询问用户）。
+        金额必须为正数；转账 type=transfer 时 account/account_id 表示转出账户，可额外用 to_account/to_account_id 指定转入账户（或省略，将询问用户）。
+        账户优先使用数字 ID（account_id，通过 bookkeeping_list_accounts 获取）；也可用名称（account），两者填一个即可。
 
         Args:
             type(string): 交易类型，取值：expense=支出 / income=收入 / transfer=转账
             amount(number): 金额（正数）
             category(string): 分类名称。如：餐饮/交通/购物/工资/奖金 等；不存在时会自动创建
-            account(string): 账户名称，如：现金/支付宝/微信/银行卡
+            account(string): 账户名称（如：现金/支付宝/微信/银行卡）；与 account_id 二选一，建议优先用 ID
+            account_id(int): 账户数字 ID；优先于 account，通过 bookkeeping_list_accounts 可查到
             note(string): 备注说明，可空
             date(string): 交易日期 YYYY-MM-DD；为空则用今天
             time(string): 交易时间 HH:MM:SS；为空则用当前时刻
@@ -95,12 +135,14 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
                 return {"ok": False, "error": "type 必须是 expense/income/transfer"}
 
             accounts = await repo.list_accounts()
-            acc = next((a for a in accounts if a["name"] == account), None)
+            acc = _resolve_account(accounts, account, account_id)
             if not acc:
                 return {
                     "ok": False,
-                    "error": f"找不到账户「{account}」",
+                    "error": f"找不到账户（名称「{account or ''}」/ID {account_id or ''}）",
                     "available_accounts": [a["name"] for a in accounts],
+                    "available_accounts_with_id": [{"id": a["id"], "name": a["name"]} for a in accounts],
+                    "hint": f"可用账户：{_accounts_hint(accounts)}",
                 }
 
             cat_type = "expense" if type_ == "expense" else "income"
@@ -141,17 +183,22 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
     async def transfer_between_accounts(
         self,
         event: AstrMessageEvent,
-        from_account: str,
-        to_account: str,
-        amount: float,
+        from_account: str = "",
+        from_account_id: int = 0,
+        to_account: str = "",
+        to_account_id: int = 0,
+        amount: float = 0,
         note: str = "",
         date: str = "",
     ):
         """在两个账户之间转账（不影响收支统计）。例如：银行卡→支付宝 还款 500 元。
+        账户优先使用数字 ID（from_account_id/to_account_id，通过 bookkeeping_list_accounts 获取）；也可用名称。
 
         Args:
-            from_account(string): 转出账户名称
-            to_account(string): 转入账户名称
+            from_account(string): 转出账户名称（与 from_account_id 二选一，建议优先用 ID）
+            from_account_id(int): 转出账户数字 ID，优先于 from_account
+            to_account(string): 转入账户名称（与 to_account_id 二选一，建议优先用 ID）
+            to_account_id(int): 转入账户数字 ID，优先于 to_account
             amount(number): 转账金额
             note(string): 备注，可空
             date(string): 日期 YYYY-MM-DD；空则今天
@@ -159,12 +206,12 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
         try:
             repo = _repo()
             accounts = await repo.list_accounts()
-            src = next((a for a in accounts if a["name"] == from_account), None)
-            dst = next((a for a in accounts if a["name"] == to_account), None)
+            src = _resolve_account(accounts, from_account, from_account_id)
+            dst = _resolve_account(accounts, to_account, to_account_id)
             if not src:
-                return {"ok": False, "error": f"找不到转出账户「{from_account}」"}
+                return {"ok": False, "error": f"找不到转出账户（名称「{from_account or ''}」/ID {from_account_id or ''}）", "hint": f"可用账户：{_accounts_hint(accounts)}"}
             if not dst:
-                return {"ok": False, "error": f"找不到转入账户「{to_account}」"}
+                return {"ok": False, "error": f"找不到转入账户（名称「{to_account or ''}」/ID {to_account_id or ''}）", "hint": f"可用账户：{_accounts_hint(accounts)}"}
             if src["id"] == dst["id"]:
                 return {"ok": False, "error": "转出与转入账户相同"}
             tx = await repo.add_transaction(
@@ -188,6 +235,7 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
         type: str = "",
         category: str = "",
         account: str = "",
+        account_id: int = 0,
         tag: str = "",
         start_date: str = "",
         end_date: str = "",
@@ -198,11 +246,13 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
 
         适用场景：用户问"最近花了什么/这个月账单/餐饮花了多少/列出 X 月所有支出"等。
         返回字段：id/类型/金额/分类/账户/备注/日期/标签，便于后续操作（更新/删除请用 id）。
+        账户筛选可用数字 ID（account_id，优先）或名称（account）。
 
         Args:
             type(string): 类型筛选：expense/income/transfer；空则全部
             category(string): 分类名称；空则全部
             account(string): 账户名称；空则全部
+            account_id(int): 账户数字 ID，优先于 account；空则全部
             tag(string): 标签名；空则全部
             start_date(string): 起始日期 YYYY-MM-DD；空则不限
             end_date(string): 结束日期 YYYY-MM-DD；空则不限
@@ -218,11 +268,11 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
                 if not cat:
                     return {"ok": False, "error": f"未找到分类「{category}」"}
             acc_id = None
-            if account:
+            if account or account_id:
                 accounts = await repo.list_accounts()
-                acc = next((a for a in accounts if a["name"] == account), None)
+                acc = _resolve_account(accounts, account, account_id)
                 if not acc:
-                    return {"ok": False, "error": f"未找到账户「{account}」"}
+                    return {"ok": False, "error": f"未找到账户（名称「{account or ''}」/ID {account_id or ''}）", "hint": f"可用账户：{_accounts_hint(accounts)}"}
                 acc_id = acc["id"]
 
             limit = max(1, min(int(limit or 20), 100))
@@ -258,6 +308,7 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
         amount: float = 0,
         category: str = "",
         account: str = "",
+        account_id: int = 0,
         note: str = "",
         date: str = "",
         time: str = "",
@@ -265,6 +316,7 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
     ):
         """修改一笔已存在的交易。只需传入要修改的字段，未提供的字段保留原值。
         金额、类型、账户的变更会自动重算账户余额。
+        账户可用数字 ID（account_id，优先）或名称（account）。
 
         Args:
             transaction_id(int): 交易 ID（通过 list_transactions 获取）
@@ -272,6 +324,7 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
             amount(number): 新金额（>0）；0 表示不变
             category(string): 新分类名；空表示不变
             account(string): 新账户名；空表示不变
+            account_id(int): 新账户数字 ID，优先于 account；0 表示不变
             note(string): 新备注
             date(string): 新日期 YYYY-MM-DD
             time(string): 新时间 HH:MM:SS
@@ -295,11 +348,11 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
                     cat = await repo.find_category_by_name(category, cat_type) or \
                           await repo.add_category(category, cat_type, sort=50)
                     fields["category_id"] = cat["id"]
-            if account:
+            if account or account_id:
                 accounts = await repo.list_accounts()
-                acc = next((a for a in accounts if a["name"] == account), None)
+                acc = _resolve_account(accounts, account, account_id)
                 if not acc:
-                    return {"ok": False, "error": f"找不到账户「{account}」"}
+                    return {"ok": False, "error": f"找不到账户（名称「{account or ''}」/ID {account_id or ''}）", "hint": f"可用账户：{_accounts_hint(accounts)}"}
                 fields["account_id"] = acc["id"]
             if note:
                 fields["note"] = note
@@ -567,7 +620,8 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
 
     @filter.llm_tool(name="bookkeeping_list_accounts")
     async def list_accounts(self, event: AstrMessageEvent):
-        """列出所有账户及当前余额。常用于"我还有多少钱/各账户余额"。"""
+        """列出所有账户（含数字 ID）及当前余额。常用于"我还有多少钱/各账户余额"。
+        记账、转账、对账等操作优先使用本工具返回的账户 ID（account_id）。"""
         try:
             repo = _repo()
             accounts = await repo.list_accounts()
@@ -575,9 +629,9 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
                 return {"ok": True, "message": "暂无账户", "accounts": []}
             currency = _cfg("currency", "¥")
             total = sum(float(a["balance"]) for a in accounts)
-            lines = [f"账户列表（合计 {currency}{total:.2f}）"]
+            lines = [f"账户列表（合计 {currency}{total:.2f}），记账请用账户 ID："]
             for a in accounts:
-                lines.append(f"  • {a['name']}（{a['type']}）: {currency}{float(a['balance']):.2f}")
+                lines.append(f"  • id={a['id']} {a['name']}（{a['type']}）: {currency}{float(a['balance']):.2f}")
             return {
                 "ok": True,
                 "message": "\n".join(lines),
@@ -597,6 +651,7 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
         note: str = "",
     ):
         """新建一个账户。可以创建任意多个同类型账户（如多张银行卡），只要 name 不重复。
+        新账户会自动分配一个固定数字 id，返回结果中可查看，后续记账/转账/对账可直接用该 id 引用。
 
         type 字段是开放文本，预设建议取值：
           cash=现金 / bank=银行卡 / alipay=支付宝 / wechat=微信 / credit=信用卡 / other
@@ -618,7 +673,7 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
             currency = _cfg("currency", "¥")
             return {
                 "ok": True,
-                "message": f"已创建账户「{acc['name']}」，余额 {currency}{float(acc['balance']):.2f}",
+                "message": f"已创建账户「{acc['name']}」(id={acc['id']})，余额 {currency}{float(acc['balance']):.2f}",
                 "account": acc,
             }
         except Exception as e:
@@ -628,23 +683,26 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
     async def adjust_balance(
         self,
         event: AstrMessageEvent,
-        account: str,
-        new_balance: float,
+        account: str = "",
+        account_id: int = 0,
+        new_balance: float = 0,
         note: str = "",
     ):
         """调整账户余额为指定值（用于对账）。会打印调整前后差额。
+        账户可用数字 ID（account_id，优先）或名称（account）。
 
         Args:
-            account(string): 账户名
+            account(string): 账户名（与 account_id 二选一，建议优先用 ID）
+            account_id(int): 账户数字 ID，优先于 account
             new_balance(number): 调整后的真实余额
             note(string): 调整原因
         """
         try:
             repo = _repo()
             accounts = await repo.list_accounts()
-            acc = next((a for a in accounts if a["name"] == account), None)
+            acc = _resolve_account(accounts, account, account_id)
             if not acc:
-                return {"ok": False, "error": f"找不到账户「{account}」"}
+                return {"ok": False, "error": f"找不到账户（名称「{account or ''}」/ID {account_id or ''}）", "hint": f"可用账户：{_accounts_hint(accounts)}"}
             old = float(acc["balance"])
             updated = await repo.adjust_balance(acc["id"], float(new_balance), note)
             currency = _cfg("currency", "¥")
@@ -668,48 +726,52 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
 
     @filter.llm_tool(name="bookkeeping_archive_account")
     async def archive_account(
-        self, event: AstrMessageEvent, account: str, archived: bool = True
+        self, event: AstrMessageEvent, account: str = "", account_id: int = 0, archived: bool = True
     ):
         """归档/恢复账户（不删除历史交易）。归档后账户不再出现在默认列表与统计中，但历史交易保留。
 
         适用于：账户停用但想保留历史记录的场景。
+        账户可用数字 ID（account_id，优先）或名称（account）。
 
         Args:
-            account(string): 账户名
+            account(string): 账户名（与 account_id 二选一，建议优先用 ID）
+            account_id(int): 账户数字 ID，优先于 account
             archived(bool): true=归档 false=恢复
         """
         try:
             repo = _repo()
             accounts = await repo.list_accounts(include_archived=True)
-            acc = next((a for a in accounts if a["name"] == account), None)
+            acc = _resolve_account(accounts, account, account_id)
             if not acc:
-                return {"ok": False, "error": f"找不到账户「{account}」"}
+                return {"ok": False, "error": f"找不到账户（名称「{account or ''}」/ID {account_id or ''}）", "hint": f"可用账户：{_accounts_hint(accounts)}"}
             await repo.update_account(acc["id"], archived=archived)
             action = "归档" if archived else "恢复"
-            return {"ok": True, "message": f"已{action}账户「{account}」"}
+            return {"ok": True, "message": f"已{action}账户「{acc['name']}」(id={acc['id']})"}
         except Exception as e:
             return {"ok": False, "error": f"失败：{e}"}
 
     @filter.llm_tool(name="bookkeeping_delete_account")
-    async def delete_account(self, event: AstrMessageEvent, account: str):
+    async def delete_account(self, event: AstrMessageEvent, account: str = "", account_id: int = 0):
         """彻底删除一个账户。仅当该账户没有任何关联交易时才能删除。
 
         如果账户已被交易引用，删除会失败 —— 此时请改用 bookkeeping_archive_account 归档，
         或者先删除/迁移该账户的所有交易。删除操作不可恢复。
+        账户可用数字 ID（account_id，优先）或名称（account）。
 
         常见场景：
         • 用户误建的账户（如重复创建、写错名字）且尚未记账 → 可直接删除
         • 已经有交易历史的账户 → 建议归档而不是删除
 
         Args:
-            account(string): 要删除的账户名
+            account(string): 要删除的账户名（与 account_id 二选一，建议优先用 ID）
+            account_id(int): 要删除的账户数字 ID，优先于 account
         """
         try:
             repo = _repo()
             accounts = await repo.list_accounts(include_archived=True)
-            acc = next((a for a in accounts if a["name"] == account), None)
+            acc = _resolve_account(accounts, account, account_id)
             if not acc:
-                return {"ok": False, "error": f"找不到账户「{account}」"}
+                return {"ok": False, "error": f"找不到账户（名称「{account or ''}」/ID {account_id or ''}）", "hint": f"可用账户：{_accounts_hint(accounts)}"}
             try:
                 ok = await repo.delete_account(acc["id"])
             except ValueError as ve:
@@ -717,12 +779,12 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
                     "ok": False,
                     "error": str(ve),
                     "suggestion": (
-                        f"若只是不再使用，请归档账户 {account}；"
+                        f"若只是不再使用，请归档账户 {acc['name']}(id={acc['id']})；"
                         "若确实要删除，请先删除该账户下的所有交易"
                     ),
                 }
             if ok:
-                return {"ok": True, "message": f"已删除账户「{account}」"}
+                return {"ok": True, "message": f"已删除账户「{acc['name']}」(id={acc['id']})"}
             return {"ok": False, "error": "删除失败"}
         except Exception as e:
             logger.error(f"delete_account error: {e}")
@@ -854,6 +916,7 @@ def register_llm_tools(plugin_cls, repo_holder, config_holder):
  • "我还有多少钱" / "账户余额"
  • "新建账户 储蓄卡 余额 5000"
  • "调整支付宝余额到 1234.5"
+ • 每个账户都有固定数字 ID，记账/转账/对账时可直接用 ID（如"用账户 2 记餐饮 50"）
 
 【管理】
  • "列出分类" / "新增分类 健身 🏋️"
